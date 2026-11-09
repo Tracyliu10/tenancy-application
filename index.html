@@ -36,7 +36,7 @@
 </form>
 </main>
 </div>
-<footer><span>INNDEAVOR · Tenancy Application</span><span>Sydney NSW 2000</span></footer>
+<footer><span>INNDEAVOR · Tenancy Application</span><span>Suite A, Level 13, UTS Central Building (CB02) 61 Broadway, Ultimo NSW 2007</span></footer>
 </div>
 <script>
 let language = 'zh';
@@ -224,7 +224,7 @@ function buildReport() {
   paragraph(t('签字版租房申请','Signed tenancy application'),43,true);
   paragraph(t(value('surname')+' '+value('given'),value('given')+' '+value('surname'))+'  |  '+value('property'),26);
   heading(t('A. 房屋提供方','A. Accommodation provider'));
-  paragraph('INNDEAVOR · Suite 14.01/55 Clarence Street, Sydney NSW 2000');
+  paragraph('INNDEAVOR · Suite A, Level 13, UTS Central Building (CB02) 61 Broadway, Ultimo NSW 2007');
   paragraph('(02) 9739 8988 · rentalteam@inndeavor.com');
   const groups = stages.flatMap(stage=>stage.groups);
   for (const letter of ['B','C','D','E','F','G','H','I']) {
@@ -303,8 +303,8 @@ const stages = [
     ['B. 房源信息 · Property details',[
       ['property','房源地址','Property address','text',1,1],['postcode','房源邮编','Postcode','text',1],
       ['bedrooms','卧室数','Bedrooms','count'],['bathrooms','浴室数','Bathrooms','count'],['parking','车位数','Car spaces','count'],
-      ['moveIn','期望入住日期','Preferred move-in date','date',1],['years','租期（年）','Lease term (years)','count'],
-      ['months','租期（月）','Lease term (months)','count'],['rent','周租金（AUD）','Weekly rent (AUD)','money',1],['promotion','优惠（如有）','Promotion','text'],
+      ['moveIn','期望入住日期','Preferred move-in date','date',1],
+      ['months','租期（月）','Lease term (months)','count',1],['rent','周租金（AUD）','Weekly rent (AUD)','money',1],['promotion','优惠（如有）','Promotion','text'],
       ['adults','成人数','Adults','count',1],['children','儿童数','Children','count',1],['ages','儿童年龄','Children’s ages','text'],
     ]]
   ]},
@@ -313,8 +313,8 @@ const stages = [
       ['title','称谓','Title',['Mr','Ms','Miss','Mrs','Other']],
       ['surname','姓氏','Surname','text',1],['given','名字','Given name(s)','text',1],['dob','出生日期','Date of birth','date',1],
       ['licence','驾照号码','Driver’s licence number','text'],['licenceExpiry','驾照到期日','Driver’s licence expiry','date'],
-      ['licenceState','驾照签发州','Driver’s licence state','text'],['passport','护照号码','Passport number','text'],['country','护照签发国','Passport country','text'],
-      ['furniture','需要家具吗？','Furniture required?',['Yes','No']],['appliances','需要电器吗？','Appliances required?',['Yes','No']],
+      ['licenceState','驾照签发州','Driver’s licence state','text'],['passport','护照号码','Passport number','text',1],['country','护照签发国','Passport country','text',1],
+      ['furniture','需要家具吗？','Furniture required?',['Yes','No'],1],['appliances','需要电器吗？','Appliances required?',['Yes','No'],1],
     ]],
     ['联系方式 · Contact details',[
       ['homePhone','住宅电话','Home phone','tel'],['mobile','手机号码','Mobile phone','tel',1],['workPhone','工作电话','Work phone','tel'],['fax','传真','Fax','tel'],
@@ -398,7 +398,7 @@ function field([key, label, english, type, required, wide]) {
   } else {
     control.type = type === 'count' || type === 'money' ? 'number' : type === 'check' ? 'checkbox' : type;
     if (type === 'count' || type === 'money') {
-      control.min = key === 'adults' ? '1' : '0';
+      control.min = ['adults','months'].includes(key) ? '1' : '0';
       control.step = type === 'money' ? '0.01' : '1';
     }
     if (['text','email','tel'].includes(type)) control.maxLength = 200;
@@ -604,11 +604,6 @@ function checkStage(index) {
       control.reportValidity();
       return false;
     }
-  }
-  if (index === 0 && !(Number(value('years')) || Number(value('months')))) {
-    notice.textContent = t('请填写大于零的租期。','Enter a lease term greater than zero.');
-    controls.get('years').focus();
-    return false;
   }
   if (index === 3) {
     if (Number(value('holding')) > Number(value('rent'))) {
