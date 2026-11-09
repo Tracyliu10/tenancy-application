@@ -25,11 +25,11 @@ function buildReport() {
     ctx.fillRect(0,0,width,116);
     text('INNDEAVOR',margin,73,34,'#e1f1cb',true);
     ctx.textAlign = 'right';
-    text('TENANCY APPLICATION',width-margin,73,22,'#ffffff',true);
+    text(t('租房申请','TENANCY APPLICATION'),width-margin,73,22,'#ffffff',true);
     ctx.textAlign = 'left';
     ctx.fillStyle = '#dbe5dc';
     ctx.fillRect(margin,height-91,width-2*margin,2);
-    text('Inndeavor  |  Tenancy Application Form',margin,height-48,19,'#3c5b4e');
+    text(t('Inndeavor  |  租房申请表','Inndeavor  |  Tenancy Application Form'),margin,height-48,19,'#3c5b4e');
     ctx.textAlign = 'right';
     text(String(pages.length+1),width-margin,height-48,19,'#3c5b4e');
     ctx.textAlign = 'left';
@@ -82,7 +82,7 @@ function buildReport() {
   function drawSignature(key, label) {
     y += 18;
     ensure(218);
-    paragraph(label+'  |  Date signed: '+value(key+'Date'),23,true);
+    paragraph(label+t('  |  签署日期：','  |  Date signed: ')+value(key+'Date'),23,true);
     ctx.fillStyle = '#f4f7f2';
     ctx.fillRect(margin,y-10,500,150);
     ctx.drawImage(signatures.get(key).canvas,margin,y-10,500,150);
@@ -90,9 +90,9 @@ function buildReport() {
   }
 
   startPage();
-  paragraph('Signed tenancy application',43,true);
-  paragraph(value('given')+' '+value('surname')+'  |  '+value('property'),26);
-  heading('A. Accommodation provider');
+  paragraph(t('签字版租房申请','Signed tenancy application'),43,true);
+  paragraph(t(value('surname')+' '+value('given'),value('given')+' '+value('surname'))+'  |  '+value('property'),26);
+  heading(t('A. 房屋提供方','A. Accommodation provider'));
   paragraph('INNDEAVOR · Suite 14.01/55 Clarence Street, Sydney NSW 2000');
   paragraph('(02) 9739 8988 · rentalteam@inndeavor.com');
   const groups = stages.flatMap(stage=>stage.groups);
@@ -100,29 +100,29 @@ function buildReport() {
     const list = groups.filter(([heading])=>heading.startsWith(letter+'.'));
     if (letter === 'C') list.push(groups.find(([heading])=>heading.startsWith('联系方式')));
     for (const [name,fields] of list) {
-      heading(name.split(' · ')[1]);
-      for (const [key,,english] of fields) paragraph(english+': '+reportValue(key));
+      heading(groupLabel(name));
+      for (const [key,label,english] of fields) paragraph(t(label+'：',english+': ')+reportValue(key));
       if (letter === 'D' && value('utility').startsWith('Yes')) {
         y += 10;
-        paragraph(terms.utilities,20);
+        paragraph(displayTerms('utilities'),20);
       }
       if (letter === 'E') {
         y += 10;
-        paragraph(terms.declaration,20);
-        drawSignature('declaration','Signature 1 · Declaration');
+        paragraph(displayTerms('declaration'),20);
+        drawSignature('declaration',signTitle('declaration'));
       }
       if (letter === 'I') {
         y += 10;
-        paragraph(terms.holding,20);
-        drawSignature('holding','Signature 2 · Holding Fee');
+        paragraph(displayTerms('holding'),20);
+        drawSignature('holding',signTitle('holding'));
       }
     }
   }
-  heading('J. 100 points of ID required');
-  paragraph(terms.id,20);
-  heading('Accommodation provider use only');
-  paragraph('Signature: _______________________    Date: __________________');
-  paragraph('Leasing manager: ________________    Interpreter language: ________________');
+  heading(t('J. 100 分身份证明材料','J. 100 points of ID required'));
+  paragraph(displayTerms('id'),20);
+  heading(t('房屋提供方专用','Accommodation provider use only'));
+  paragraph(t('签字：_____________________    日期：__________________','Signature: _______________________    Date: __________________'));
+  paragraph(t('租赁经理：________________    口译语言：________________','Leasing manager: ________________    Interpreter language: ________________'));
   return encodePdf(pages);
 }
 

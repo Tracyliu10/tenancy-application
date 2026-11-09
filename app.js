@@ -42,7 +42,7 @@ const stages = [
   { title:'声明与两处签字', en:'DECLARATION & SIGNATURES', lead:'阅读各项条款后，用手指或鼠标在两个签名框分别签字。', groups:[
     ['E. 申请声明 · Declaration',[
       ['sales','销售顾问姓名','Sales consultant','text',1],['salesEmail','销售邮箱（选填，留空发给租赁团队）','Sales email','email'],
-      ['agreement','我已阅读销售提供的租赁协议样本及相关附件，并确认本次申请信息。','Applicant confirms review of the sample agreement and related attachments','check',1,1],
+      ['agreement','我已阅读销售提供的租赁协议样本及相关附件，并确认本次申请信息。','I have read the sample lease and related attachments provided by the sales team and confirm my application details.','check',1,1],
     ]],
     ['I. 留房费 · Holding fee',[
       ['holding','留房费（AUD）','Holding fee (AUD)','money',1],
@@ -61,6 +61,7 @@ const controls = new Map();
 const signatures = new Map();
 let step = 0;
 let reached = 0;
+let reportUrl = null;
 
 function element(tag, text, className) {
   const node = document.createElement(tag);
@@ -71,16 +72,23 @@ function element(tag, text, className) {
 
 function field([key, label, english, type, required, wide]) {
   const wrap = element('label','',wide ? 'field wide' : 'field');
-  const heading = element('span',label);
+  const heading = element('span');
+  const title = document.createTextNode('');
+  heading.append(title);
+  localized.push(() => { title.data = t(label,english); });
   if (required) heading.append(element('b',' *','required'));
-  heading.append(element('small',english));
+  if (type !== 'check') {
+    const subtitle = element('small',english);
+    heading.append(subtitle);
+    localized.push(() => { subtitle.hidden = language === 'en'; });
+  }
   wrap.append(heading);
   const control = element(Array.isArray(type) ? 'select' : type === 'textarea' ? 'textarea' : 'input');
   control.name = key;
   control.required = Boolean(required);
   if (Array.isArray(type)) {
     for (const option of ['',...type]) {
-      const item = element('option',option || '请选择');
+      const item = translated('option',()=>optionLabel(option));
       item.value = option;
       control.append(item);
     }
@@ -96,28 +104,32 @@ function field([key, label, english, type, required, wide]) {
     if (['text','email','tel'].includes(type)) control.maxLength = 200;
   }
   if (['postcode','currentPostcode'].includes(key)) control.inputMode = 'numeric';
+  const placeholders = {surname:'Zhang', given:'San', property:'12 George Street, Sydney NSW', currentAddress:'12 George Street, Sydney NSW', relativeSurname1:'Zhang', relativeSurname2:'Zhang', relativeGiven1:'San', relativeGiven2:'San'};
+  if (placeholders[key]) control.placeholder = placeholders[key];
   wrap.append(control);
   controls.set(key, control);
   return wrap;
 }
 
 function addTerms(parent, text) {
-  parent.append(element('div', text, 'terms'));
+  parent.append(translated('div',()=>displayTerms(text,true),'terms'));
 }
 
-function signature(key, label) {
+function signature(key) {
   const box = element('div','','signature');
-  box.append(element('h3',label),element('p','请在下方手写签名，再填写签署日期。'));
+  box.append(translated('h3',()=>signTitle(key)),translated('p',()=>t('请在下方手写签名，再填写签署日期。','Sign by hand below, then enter the signing date.')));
   const pad = element('div','','sig-pad');
   const canvas = element('canvas');
   canvas.width = 1000;
   canvas.height = 300;
-  canvas.setAttribute('aria-label', label + ' 手写签名区');
+  localized.push(()=>canvas.setAttribute('aria-label',signTitle(key)));
   pad.append(canvas);
   const actions = element('div','','sig-tools');
-  const status = element('span','待签字');
+  const status = element('span');
+  const updateStatus = () => { status.textContent = hasInk ? t('已签字','Signed') : t('待签字','Awaiting signature'); };
+  localized.push(updateStatus);
   status.setAttribute('aria-live','polite');
-  const clear = element('button','清除重签','secondary');
+  const clear = translated('button',()=>t('清除重签','Clear signature'),'secondary');
   clear.type = 'button';
   actions.append(status,clear);
   const date = field([key+'Date','签署日期','Date signed','date',1]);
@@ -150,7 +162,7 @@ function signature(key, label) {
     pen.stroke();
     last = point;
     hasInk = true;
-    status.textContent = '已签字';
+    updateStatus();
     notice.textContent = '';
   });
   for (const type of ['pointerup','pointercancel','lostpointercapture']) {
@@ -159,7 +171,7 @@ function signature(key, label) {
   clear.addEventListener('click', () => {
     pen.clearRect(0,0,canvas.width,canvas.height);
     hasInk = false;
-    status.textContent = '待签字';
+    updateStatus();
   });
   signatures.set(key,{canvas,box,hasInk:()=>hasInk,clear:()=>clear.click()});
   return box;
@@ -167,41 +179,41 @@ function signature(key, label) {
 
 for (const [index, stage] of stages.entries()) {
   const panel = element('section','','panel');
-  const title = element('h2',stage.title);
+  const title = translated('h2',()=>t(stage.title,stageTitles[index]));
   title.tabIndex = -1;
-  panel.append(element('div',`STEP 0${index+1} / ${stage.en}`,'kicker'),title,element('p',stage.lead,'lead'));
+  panel.append(element('div',`STEP 0${index+1} / ${stage.en}`,'kicker'),title,translated('p',()=>t(stage.lead,stageLeads[index]),'lead'));
   for (const [heading, fields] of stage.groups) {
     const group = element('section','','group');
     const grid = element('div','','grid');
-    group.append(element('h3',heading),grid);
+    group.append(translated('h3',()=>groupLabel(heading)),grid);
     for (const definition of fields) grid.append(field(definition));
     if (heading.startsWith('D.')) {
       const info = element('details');
-      info.append(element('summary','查看公用服务开通流程与说明'));
-      addTerms(info,terms.utilities);
+      info.append(translated('summary',()=>t('查看公用服务开通流程与说明','View utility connection information')));
+      addTerms(info,'utilities');
       group.append(info);
     }
     if (heading.startsWith('E.')) {
-      addTerms(group,terms.declaration);
-      group.append(signature('declaration','签字 1 · 申请声明'));
+      addTerms(group,'declaration');
+      group.append(signature('declaration'));
     }
     if (heading.startsWith('I.')) {
-      addTerms(group,terms.holding);
-      group.append(signature('holding','签字 2 · 留房费条款'));
+      addTerms(group,'holding');
+      group.append(signature('holding'));
     }
     panel.append(group);
   }
   if (index === 4) {
     panel.append(element('div','','review'));
     const id = element('details','','group');
-    id.append(element('summary','J. 查看 100 分身份证明材料清单'));
-    addTerms(id,terms.id);
+    id.append(translated('summary',()=>t('J. 查看 100 分身份证明材料清单','J. View the 100-point identification checklist')));
+    addTerms(id,'id');
     panel.append(id,element('div','','send'));
   }
   panels.append(panel);
   const jump = element('button');
   jump.type = 'button';
-  jump.append(element('span',String(index+1).padStart(2,'0'),'stepnum'),document.createTextNode(stage.title));
+  jump.append(element('span',String(index+1).padStart(2,'0'),'stepnum'),translated('span',()=>t(stage.title,stageTitles[index])));
   jump.addEventListener('click',()=>navigate(index));
   nav.append(jump);
 }
@@ -209,7 +221,9 @@ for (const [index, stage] of stages.entries()) {
 const value = key => controls.get(key).value.trim();
 function reportValue(key) {
   const control = controls.get(key);
-  return control.type === 'checkbox' ? (control.checked ? 'Yes' : '—') : value(key) || '—';
+  if (control.type === 'checkbox') return control.checked ? t('是','Yes') : '—';
+  const answer = value(key);
+  return control.tagName === 'SELECT' && answer ? optionLabel(answer) : answer || '—';
 }
 
 function renderReview() {
@@ -218,14 +232,14 @@ function renderReview() {
   for (const [index, stage] of stages.slice(0,4).entries()) {
     const row = element('details','','overview group');
     row.open = index === 0;
-    row.append(element('summary',stage.title));
+    row.append(element('summary',t(stage.title,stageTitles[index])));
     for (const [heading,fields] of stage.groups) {
-      row.append(element('h4',heading));
-      for (const [key,label] of fields) row.append(element('p',label + ' · ' + reportValue(key)));
+      row.append(element('h4',groupLabel(heading)));
+      for (const [key,label,english] of fields) row.append(element('p',t(label,english) + ' · ' + reportValue(key)));
     }
     review.append(row);
   }
-  const line = element('p',`已签署申请声明（${value('declarationDate')}）及留房费条款（${value('holdingDate')}）。`,'terms');
+  const line = element('p',t(`已签署申请声明（${value('declarationDate')}）及留房费条款（${value('holdingDate')}）。`,`Declaration signed ${value('declarationDate')}. Holding fee terms signed ${value('holdingDate')}.`),'terms');
   review.append(line);
 }
 
@@ -239,14 +253,19 @@ function render(focus) {
     if (i === step) jump.setAttribute('aria-current','step');
     else jump.removeAttribute('aria-current');
   }
-  document.querySelector('#mobile-progress').textContent = `步骤 ${step+1} / ${stages.length} · ${stages[step].title}`;
+  document.querySelector('#mobile-progress').textContent = `${t('步骤','Step')} ${step+1} / ${stages.length} · ${t(stages[step].title,stageTitles[step])}`;
   back.hidden = step === 0;
-  next.textContent = step === 4 ? '下载签字版 PDF' : '继续 →';
+  back.textContent = t('上一步','Back');
+  next.textContent = step === 4 ? t('导出签字版 PDF','Export signed PDF') : t('继续 →','Continue →');
   notice.textContent = '';
   notice.className = '';
   if (step === 4) {
     renderReview();
-    document.querySelector('.send').replaceChildren();
+    const send = document.querySelector('.send');
+    send.replaceChildren();
+    send.className = 'send';
+    if (reportUrl) URL.revokeObjectURL(reportUrl);
+    reportUrl = null;
   }
   if (focus) {
     panels.children[step].querySelector('h2').focus({preventScroll:true});
@@ -262,25 +281,32 @@ function checkStage(index) {
       return false;
     }
     if (control.required && control.type === 'text' && !control.value.trim()) {
-      control.setCustomValidity('请填写此项。');
+      control.setCustomValidity(t('请填写此项。','Please fill out this field.'));
+      control.reportValidity();
+      return false;
+    }
+    const answer = control.value.trim();
+    if (answer && ['text','textarea'].includes(control.type) &&
+        !/^[\p{Script=Latin}\p{M}0-9\p{P}+$&\s]+$/u.test(answer)) {
+      control.setCustomValidity(t('请用英文字母填写，例如 Zhang San。可以使用数字和标点。','Use Latin letters, such as Zhang San. Numbers and punctuation are allowed.'));
       control.reportValidity();
       return false;
     }
   }
   if (index === 0 && !(Number(value('years')) || Number(value('months')))) {
-    notice.textContent = '请填写大于零的租期。';
+    notice.textContent = t('请填写大于零的租期。','Enter a lease term greater than zero.');
     controls.get('years').focus();
     return false;
   }
   if (index === 3) {
     if (Number(value('holding')) > Number(value('rent'))) {
-      notice.textContent = '留房费不能超过一周租金，请与销售顾问核对金额。';
+      notice.textContent = t('留房费不能超过一周租金，请与销售顾问核对金额。','The holding fee cannot exceed one week’s rent. Check the amount with your sales consultant.');
       controls.get('holding').focus();
       return false;
     }
     for (const sig of signatures.values()) {
       if (!sig.hasInk()) {
-        notice.textContent = '请先完成两处手写签名。';
+        notice.textContent = t('请先完成两处手写签名。','Please complete both handwritten signatures.');
         sig.box.scrollIntoView({block:'center'});
         return false;
       }
@@ -308,7 +334,7 @@ form.addEventListener('input', event => {
       if (key === 'declaration' && event.target.name === 'holding') continue;
       if (sig.hasInk()) {
         sig.clear();
-        notice.textContent = '申请内容已修改，请重新签字。';
+        notice.textContent = t('申请内容已修改，请重新签字。','Application details changed. Please sign again.');
       }
     }
   }
@@ -319,23 +345,68 @@ form.addEventListener('submit',event=>{
   if (step < 4) return navigate(step+1);
   try {
     const pdf = buildReport();
-    const url = URL.createObjectURL(pdf);
-    const link = element('a');
-    link.href = url;
-    link.download = 'Inndeavor-Tenancy-Application.pdf';
-    document.body.append(link);
-    link.click();
-    link.remove();
-    setTimeout(()=>URL.revokeObjectURL(url),60000);
+    const filename = `Inndeavor-Tenancy-Application-${t('CN','EN')}.pdf`;
+    if (reportUrl) URL.revokeObjectURL(reportUrl);
+    reportUrl = URL.createObjectURL(pdf);
+    const download = element('a',t('下载 PDF','Download PDF'));
+    download.href = reportUrl;
+    download.download = filename;
+    const preview = element('a',t('打开 PDF','Open PDF'));
+    preview.href = reportUrl;
+    preview.target = '_blank';
+    preview.rel = 'noopener';
+    const email = element('a',t('打开邮件草稿','Open email draft'));
+    const recipient = value('salesEmail') || 'rentalteam@inndeavor.com';
+    const subject = t('Inndeavor 租房申请','Inndeavor Tenancy Application');
+    const body = t('您好，随信附上我的签字版租房申请。谢谢！','Hi, please find my signed tenancy application attached. Thank you.');
+    email.href = 'mailto:'+encodeURIComponent(recipient)+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+    const actions = element('div','','export-actions');
+    const file = new File([pdf],filename,{type:'application/pdf'});
+    if (navigator.share && navigator.canShare?.({files:[file]})) {
+      const share = element('button',t('分享 PDF','Share PDF'));
+      share.type = 'button';
+      share.addEventListener('click',async()=>{
+        try {
+          await navigator.share({files:[file]});
+        } catch (error) {
+          if (error.name !== 'AbortError') notice.textContent = t('分享失败，请试用下载或打开 PDF。','Sharing failed. Download or open the PDF instead.');
+        }
+      });
+      actions.append(share);
+    }
+    actions.append(download,preview,email);
     const sent = document.querySelector('.send');
     sent.className = 'send send-box';
-    const email = element('a','打开邮件草稿');
-    const recipient = value('salesEmail') || 'rentalteam@inndeavor.com';
-    email.href = 'mailto:'+encodeURIComponent(recipient)+'?subject='+encodeURIComponent('Inndeavor Tenancy Application')+'&body='+encodeURIComponent('Hi,\n\nPlease find my signed tenancy application attached.\n\nThank you.');
-    sent.replaceChildren(element('strong','PDF 已生成'),element('p','打开邮件草稿，附上刚下载的 PDF，再发送至 '+recipient+'。'),email);
+    const hint = t(`可直接分享文件，或下载后附到邮件发至 ${recipient}。若手机无法下载，可先打开 PDF，再用浏览器菜单保存或分享。`,`Share the file, or download and attach it to an email to ${recipient}. If your phone cannot download it, open the PDF and use your browser’s save or share menu.`);
+    sent.replaceChildren(element('strong',t('PDF 已生成','PDF ready')),element('p',hint),actions);
+    sent.scrollIntoView({block:'nearest'});
   } catch (error) {
     console.error(error);
-    notice.textContent = 'PDF 未能生成。请保留当前页面并重试。';
+    notice.textContent = t('PDF 未能生成。请保留当前页面并重试。','The PDF could not be generated. Keep this page open and try again.');
   }
 });
-render(false);
+function setLanguage(nextLanguage) {
+  language = nextLanguage;
+  document.documentElement.lang = t('zh-CN','en');
+  document.title = t('Inndeavor · 租房申请','Inndeavor · Tenancy Application');
+  document.querySelector('.intro h1').textContent = t('租房申请','Tenancy application');
+  document.querySelector('.intro p').textContent = t('填写申请信息并完成两处签字，然后将 PDF 发给销售顾问。','Fill in the application, sign in both places, then send the PDF to your sales consultant.');
+  document.querySelector('.writing-guide').textContent = writingGuide();
+  document.querySelector('aside').setAttribute('aria-label',t('填写进度','Application progress'));
+  document.querySelector('.steps-label').textContent = t('申请进度','Application progress');
+  document.querySelector('.privacy strong').textContent = t('资料保存在当前页面','Your information stays on this page');
+  document.querySelector('.privacy p').textContent = t('关闭或刷新页面前，请先保存 PDF。','Save the PDF before closing or reloading this page.');
+  for (const button of document.querySelectorAll('[data-language]')) {
+    button.setAttribute('aria-pressed',String(button.dataset.language === language));
+  }
+  for (const update of localized) update();
+  for (const control of controls.values()) control.setCustomValidity('');
+  render(false);
+}
+
+for (const button of document.querySelectorAll('[data-language]')) {
+  button.addEventListener('click',()=> {
+    if (language !== button.dataset.language) setLanguage(button.dataset.language);
+  });
+}
+setLanguage(navigator.language.toLowerCase().startsWith('zh') ? 'zh' : 'en');
